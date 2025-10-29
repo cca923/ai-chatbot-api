@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -13,17 +13,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
     ]
 
-    # --- THIS IS THE FIX ---
-    # We are temporarily COMMENTING OUT the Config class.
-    # This stops pydantic-settings from actively trying to
-    # load a .env file that might be misconfigured.
-    # It will now ONLY use the default values above.
-    # We will re-enable this in when we add GEMINI_API_KEY.
-
-    # class Config:
-    #     env_file = ".env"
-    #     env_file_encoding = "utf-8"
-    # ---------------------
+    GEMINI_API_KEY: Optional[str] = None
 
 
 # Create a single, importable instance of the settings
