@@ -1,17 +1,21 @@
 from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
-from app.services.sse_service import sse_event_generator
+from app.services.sse_service import search_event_generator
 
-# Create a new router for chat endpoints
 router = APIRouter()
 
 
 @router.get("/ask")
-async def get_ask(request: Request):
+async def get_ask(request: Request, query: str):
     """
     The main SSE route.
-    The final URL will be /api/chat/ask
+    It now accepts a 'query' parameter from the URL.
     """
-    print("Client connected to /api/chat/ask")
-    event_generator = sse_event_generator(request)
+    if not query:
+        return {"error": "Query parameter is required."}
+
+    print(f"Client connected to /api/chat/ask with query: '{query}'")
+
+    event_generator = search_event_generator(request, query)
+
     return EventSourceResponse(event_generator)
