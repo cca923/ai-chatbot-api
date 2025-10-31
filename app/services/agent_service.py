@@ -14,16 +14,13 @@ except Exception as e:
     print(f"An unexpected error occurred during genai configuration: {e}")
 
 
-# --- Refactor: Planner Agent ---
+# --- Agents ---
 async def _run_planner(query: str, model_name: str) -> list[str]:
     """
     Phase 1: The Planner agent generates search queries based on the user's query.
-    (This is run by the D7.5 refactored service)
     """
     print(f"AGENT (Planner): Initializing with model {model_name}...")
-
     model = genai.GenerativeModel(model_name)
-
     planner_prompt = f"""
     You are an expert search query planner.
     The user's query is: "{query}"
@@ -38,55 +35,35 @@ async def _run_planner(query: str, model_name: str) -> list[str]:
       "query 3"
     ]
     """
-
     try:
         response = await model.generate_content_async(planner_prompt)
-
-        # Clean the response to get only the JSON part
         json_str = response.text.strip().lstrip("```json").lstrip("```").rstrip("```")
         print(f"AGENT (Planner): Raw response: \n{json_str}")
-
         search_queries = json.loads(json_str)
         print(f"AGENT (Planner): Generated queries: {search_queries}")
         return search_queries
-
-    except json.JSONDecodeError as e:
-        print(f"AGENT (Planner): Error - Failed to decode JSON: {e}")
-        # Fallback: use the original query
-        return [query]
     except Exception as e:
         print(f"AGENT (Planner): Error - {e}")
-        # Fallback: use the original query
-        return [query]
+        return [query]  # Fallback to original query
 
 
-# --- Refactor: Researcher Agent ---
 async def _run_researcher(search_queries: list[str]) -> tuple[str, list[dict]]:
     """
     Phase 2: The Researcher agent fetches snippets for the queries.
-    It uses the D7.6 optimized 'search_and_get_snippets' service.
     """
     print(f"AGENT (Researcher): Initializing...")
-
-    # Create concurrent tasks for all search queries
     tasks = [search_and_get_snippets(q, max_results=2) for q in search_queries]
-
-    # Run all search tasks concurrently
     results_lists = await asyncio.gather(*tasks)
 
-    # Flatten the list of lists and prepare context
     all_snippets = []
     context_str = ""
     source_id_counter = 1
-
-    # We use a set to avoid duplicate URLs
     seen_urls = set()
 
     for results in results_lists:
         for res in results:
             if res["url"] not in seen_urls:
                 seen_urls.add(res["url"])
-
                 snippet_data = {
                     "id": source_id_counter,
                     "url": res["url"],
@@ -94,75 +71,71 @@ async def _run_researcher(search_queries: list[str]) -> tuple[str, list[dict]]:
                     "content": res["content"],  # This is the snippet
                 }
                 all_snippets.append(snippet_data)
-
-                # Format for the AI's context
                 context_str += f"[Source {source_id_counter}]:\n"
                 context_str += f"URL: {res['url']}\n"
                 context_str += f"Title: {res['title']}\n"
                 context_str += f"Snippet: {res['content']}\n\n"
-
                 source_id_counter += 1
 
     print(f"AGENT (Researcher): Found {len(all_snippets)} unique snippets.")
     return context_str, all_snippets
 
 
-async def _run_writer(query: str, context_str: str, model_name: str):
+async def _run_writer(
+    query: str, context_str: str, model_name: str
+) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Phase 3: The Writer agent generates a streaming answer based on the context.
+    This is an async generator.
     """
     print(f"AGENT (Writer): Initializing with model {model_name}...")
-
     model = genai.GenerativeModel(model_name)
 
-    writer_prompt = f"""
-    You are an expert AI assistant. Your task is to answer the user's query based *only* on the provided sources.
+    prompt = f"""
+    You are an expert AI assistant. Your task is to answer the user's query based *only* on the provided sources (snippets).
     Do not use any prior knowledge.
-    The user's query is: "{query}"
 
-    Here are the relevant source snippets:
-    ---
+    Here are the provided source snippets:
+    <Sources>
     {context_str}
-    ---
+    </Sources>
 
-    Please provide a concise, factual answer to the user's query.
+    User Query: "{query}"
     
-    **CRITICAL: CITATION FORMAT**:
-    1.  You MUST cite *every* piece of information you use.
-    2.  Citations MUST be in the **exact** Markdown link format: `[1](#citation:1)`, `[2](#citation:2)`, etc.
-    3.  If a sentence is synthesized from multiple sources, cite all of them, e.g., `[1](#citation:1)[2](#citation:2)`.
+    Instructions:
+    1.  Read the User Query and the Provided Sources.
+    2.  Synthesize a clear, concise, and helpful answer to the query using *only* the information in the <Sources>.
+    3.  If the <Sources> do not contain enough information, state "I'm sorry, but the provided search results do not contain enough information to answer this question."
+    4.  You **MUST** cite the sources you use. Citations MUST be placed *immediately* after the information they support.
+    5.  **CRITICAL**: Citations MUST be formatted as Markdown anchor links: `[<source_id>](#citation-<source_id>)`.
+    6.  Your answer must be in Markdown format.
 
-    **Good Example (This is what you MUST do):**
-    The sky is blue [1](#citation:1). It is also high up [1](#citation:1)[2](#citation:2).
+    EXAMPLE:
+    ...the sky is blue [1](#citation-1). AI is a complex field [2](#citation-2).
 
-    **Bad Example (DO NOT do this):**
-    The sky is blue [1].
-    
-    **Bad Example (DO NOT do this):**
-    The sky is blue 1.
-
-    Now, please answer the query based *only* on the provided sources.
+    Now, generate the answer based *only* on the <Sources> provided.
     """
 
     try:
         # We use stream=True to get chunks
-        stream = await model.generate_content_async(writer_prompt, stream=True)
+        stream = await model.generate_content_async(prompt, stream=True)
 
         async for chunk in stream:
             if chunk.text:
                 # Yield each text chunk as it arrives
-                yield chunk.text
+                yield {"event": "chunk", "data": chunk.text}
 
-        print(f"AGENT (Writer): Finished streaming.")
+        print(f"AGENT (Writer): Finished streaming answer.")
 
     except Exception as e:
         print(f"AGENT (Writer): Error - {e}")
-        # Yield a user-facing error message
-        yield f"\n\n[Error] An error occurred while generating the answer: {e}"
+        yield {"event": "error", "data": f"An error occurred in the Writer agent: {e}"}
 
 
-# --- Refactor: Orchestrator ---
-async def run_agent_workflow(query: str):
+# --- Orchestrator ---
+async def run_agent_workflow(
+    query: str,
+) -> AsyncGenerator[Dict[str, Any], None]:
     """
     The main orchestrator that runs the full Planner -> Researcher -> Writer workflow.
     This is what the 'chat.py' endpoint calls.
@@ -189,7 +162,6 @@ async def run_agent_workflow(query: str):
         # === PHASE 3: WRITER ===
         yield {"event": "trace", "data": "Phase 3: Reading and Writing..."}
 
-        # Check if context is empty
         if not context_str:
             yield {"event": "trace", "data": "No relevant snippets found."}
             yield {
@@ -198,8 +170,8 @@ async def run_agent_workflow(query: str):
             }
         else:
             # We yield 'chunk' events for the streaming answer
-            async for chunk in _run_writer(query, context_str, WRITER_MODEL):
-                yield {"event": "chunk", "data": chunk}
+            async for event in _run_writer(query, context_str, WRITER_MODEL):
+                yield event  # Pass the event (chunk or error) through
 
         # === PHASE 4: DONE ===
         print("--- WORKFLOW COMPLETE ---")
