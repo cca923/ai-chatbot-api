@@ -1,95 +1,45 @@
 import asyncio
-import httpx
 from ddgs import DDGS
-from readability import Document
-import trafilatura
-from typing import List, Dict, Optional
+from typing import List, Dict, Any
 
 
-# We define a User-Agent header to pretend we are a real browser
-BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-}
-
-
-async def scrape_url_content(client: httpx.AsyncClient, url: str) -> Optional[str]:
+async def search_and_get_snippets(
+    query: str, max_results: int = 5
+) -> List[Dict[str, Any]]:
     """
-    Asynchronously scrape content from a single URL.
-    Uses readability-lxml and trafilatura as a fallback.
+    Performs a DuckDuckGo search and returns a list of snippets.
+    This is the optimized version that AVOIDS scraping.
     """
-    try:
-        response = await client.get(
-            url,
-            timeout=10.0,
-            follow_redirects=True,
-            headers=BROWSER_HEADERS,
-        )
-
-        response.raise_for_status()
-
-        doc = Document(response.text)
-        content_html = doc.summary(html_partial=True)
-
-        if not content_html or len(content_html) < 100:
-            content_text = trafilatura.extract(response.text)
-            if content_text:
-                return content_text
-
-        return content_html
-
-    except httpx.HTTPStatusError as e:
-        print(f"HTTP error scraping {url}: {e.response.status_code}")
-    except httpx.RequestError as e:
-        print(f"Network error scraping {url}: {e}")
-    except Exception as e:
-        print(f"Error scraping {url}: {e}")
-
-    return None
-
-
-async def search_and_scrape(query: str, max_results: int = 5) -> List[Dict[str, str]]:
-    """
-    Search DuckDuckGo, then concurrently scrape the results.
-    """
-    search_results = []
+    print(f"WEB SEARCH: Searching snippets for '{query}'...")
 
     try:
-        print(f"Searching for: {query}")
-        # We wrap the sync call in asyncio.to_thread
-        search_results = await asyncio.to_thread(
-            DDGS().text,
-            query=query,
-            max_results=max_results,
+        # Use asyncio.to_thread to run the blocking search in a separate thread
+        # We must use query=query, not keywords=query, for the new 'ddgs' package
+        results_list = await asyncio.to_thread(
+            DDGS().text, query=query, max_results=max_results
         )
-        if not search_results:
-            print("No search results found.")
+
+        if not results_list:
+            print("WEB SEARCH: No results found from DDGS.")
             return []
 
+        # Format the results
+        snippets = []
+        for r in results_list:
+            # DDGS returns 'title', 'href', 'body'
+            # 'body' is the snippet we want
+            if r.get("body"):  # Only include if snippet (body) exists
+                snippets.append(
+                    {
+                        "title": r.get("title", "No Title"),
+                        "url": r.get("href", ""),
+                        "content": r.get("body"),  # This is the snippet
+                    }
+                )
+
+        print(f"WEB SEARCH: Found {len(snippets)} snippets.")
+        return snippets
+
     except Exception as e:
-        print(f"DuckDuckGo search failed: {e}")
+        print(f"WEB SEARCH: Error during snippet search: {e}")
         return []
-
-    print(f"Found {len(search_results)} results. Starting scrape...")
-    final_data = []
-
-    # We can also set default headers for the entire client
-    async with httpx.AsyncClient(headers=BROWSER_HEADERS) as client:
-        tasks = [
-            scrape_url_content(client, result["href"]) for result in search_results
-        ]
-        scraped_contents = await asyncio.gather(*tasks, return_exceptions=True)
-
-    for search_result, content_or_error in zip(search_results, scraped_contents):
-        if isinstance(content_or_error, str) and content_or_error:
-            final_data.append(
-                {
-                    "url": search_result["href"],
-                    "title": search_result["title"],
-                    "content": content_or_error,
-                }
-            )
-        else:
-            print(f"Failed to scrape {search_result['href']}: {content_or_error}")
-
-    print(f"Successfully scraped {len(final_data)} of {len(search_results)} pages.")
-    return final_data
