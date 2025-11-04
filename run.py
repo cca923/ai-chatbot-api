@@ -1,29 +1,29 @@
-import uvicorn
 import os
+import uvicorn
 from dotenv import load_dotenv
 
+# Load environment variables from .env file for local development
+print("Loading environment variables from .env...")
+load_dotenv()
 
-def main():
-    """
-    Main function to run the Uvicorn server.
-    """
-    # Load environment variables from .env file
-    load_dotenv()
 
-    host = os.getenv("APP_HOST", "0.0.0.0")
-    port = int(os.getenv("APP_PORT", "8000"))
+if __name__ == "__main__":
+    # Render Port Configuration
+    port_str = os.environ.get("PORT", "8000")
+    try:
+        port = int(port_str)
+    except ValueError:
+        print(f"Warning: Invalid PORT '{port_str}', defaulting to 8000.")
+        port = 8000
+
+    host = "0.0.0.0"
 
     print(f"Starting server on {host}:{port}")
 
-    # "app.main:app" points to the 'app' instance in 'app/main.py'
     uvicorn.run(
         "app.main:app",
         host=host,
         port=port,
-        reload=True,  # Enable auto-reload
-        reload_dirs=["app"],  # Watch the 'app' directory
+        reload=True,  # Enable auto-reload for local dev
+        reload_dirs=["app"],  # Watch the 'app' directory for changes
     )
-
-
-if __name__ == "__main__":
-    main()
