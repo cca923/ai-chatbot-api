@@ -28,4 +28,4 @@ app.include_router(api_router, prefix="/api")
 @app.get("/")
 def get_root():
     """Root endpoint for a simple health check."""
-    return {"message": "Welcome to AI Chatbot API!"}
+    return {"message": "Welcome to Insight AI API!"}
