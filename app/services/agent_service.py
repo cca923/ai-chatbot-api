@@ -1,8 +1,9 @@
+import re
 import asyncio
 import json
 from google import generativeai as genai
 from app.core.config import settings
-from app.services.web_search import search_and_get_snippets  # D7.6 optimization
+from app.services.web_search import search_and_get_snippets
 from typing import AsyncGenerator, Dict, Any
 
 # --- Configure Gemini ---
@@ -68,7 +69,7 @@ async def _run_researcher(search_queries: list[str]) -> tuple[str, list[dict]]:
                     "id": source_id_counter,
                     "url": res["url"],
                     "title": res["title"],
-                    "content": res["content"],  # This is the snippet
+                    "content": res["content"],
                 }
                 all_snippets.append(snippet_data)
                 context_str += f"[Source {source_id_counter}]:\n"
@@ -117,13 +118,21 @@ async def _run_writer(
     """
 
     try:
-        # We use stream=True to get chunks
+        # Use stream=True to get chunks
         stream = await model.generate_content_async(prompt, stream=True)
 
         async for chunk in stream:
             if chunk.text:
-                # Yield each text chunk as it arrives
-                yield {"event": "chunk", "data": chunk.text}
+                text_chunk = chunk.text
+                # Fix mixed brackets around citation links: (#citation-1], [#citation-1), or [#citation-1] -> (#citation-1)
+                text_chunk = re.sub(
+                    r"[\[\(]#citation-(\d+)[\]\)]", r"(#citation-\1)", text_chunk
+                )
+                # Remove extra spaces between citation ID and link: [1] (#citation-1) -> [1](#citation-1)
+                text_chunk = re.sub(
+                    r"\[(\d+)\]\s+\(#citation-", r"[\1](#citation-", text_chunk
+                )
+                yield {"event": "chunk", "data": text_chunk}
 
         print(f"AGENT (Writer): Finished streaming answer.")
 
@@ -148,11 +157,11 @@ async def run_agent_workflow(
 
     try:
         # === PHASE 1: PLANNER ===
-        yield {"event": "trace", "data": "Phase 1: Planning..."}
+        yield {"event": "trace", "data": "Planning..."}
         search_queries = await _run_planner(query, PLANNER_MODEL)
 
         # === PHASE 2: RESEARCHER ===
-        yield {"event": "trace", "data": "Phase 2: Searching..."}
+        yield {"event": "trace", "data": "Searching..."}
         context_str, sources = await _run_researcher(search_queries)
 
         # === PHASE 2.5: YIELD SOURCES ===
@@ -160,7 +169,7 @@ async def run_agent_workflow(
         yield {"event": "sources", "data": json.dumps(sources)}
 
         # === PHASE 3: WRITER ===
-        yield {"event": "trace", "data": "Phase 3: Reading and Writing..."}
+        yield {"event": "trace", "data": "Reading and Writing..."}
 
         if not context_str:
             yield {"event": "trace", "data": "No relevant snippets found."}
