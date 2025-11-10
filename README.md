@@ -33,6 +33,7 @@ ai-chatbot-api/
 │   │   └── web_search.py    # DDGS snippet-fetching service
 │   └── main.py              # FastAPI entry point, registers middleware & routers
 ├── .env.example             # Example environment file
+├── PROMPT_LOG.md            # Record of key AI prompts and development decisions
 ├── README.md                # This file
 ├── requirements.txt         # Python dependencies
 └── run.py                   # Server launcher (for local dev & Render deployment)
