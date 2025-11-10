@@ -152,8 +152,8 @@ async def run_agent_workflow(
     """
     print(f"--- WORKFLOW STARTED (Query: {query}) ---")
 
-    PLANNER_MODEL = "gemini-2.0-flash"
-    WRITER_MODEL = "gemini-2.0-flash"
+    PLANNER_MODEL = settings.PLANNER_GEMINI_MODEL
+    WRITER_MODEL = settings.WRITER_GEMINI_MODEL
 
     try:
         # === PHASE 1: PLANNER ===

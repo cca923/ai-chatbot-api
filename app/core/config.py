@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ]
 
     GEMINI_API_KEY: Optional[str] = None
+    PLANNER_GEMINI_MODEL: str = "gemini-2.0-flash"
+    WRITER_GEMINI_MODEL: str = "gemini-2.0-flash"
 
 
 # Create a single, importable instance of the settings

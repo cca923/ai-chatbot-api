@@ -85,7 +85,7 @@ pip install -r requirements.txt
 
 ## Step 3. Set up environment variables
 
-Copy `.env.example` to `.env` and fill in your `GEMINI_API_KEY`:
+Copy `.env.example` to `.env` and fill in the configurations:
 
 ```bash
 cp .env.example .env
