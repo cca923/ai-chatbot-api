@@ -1,4 +1,4 @@
-# Insight AI - Backend API
+# Insight AI - Backend
 
 This is the backend service for the **Insight AI** search assistant. It’s built with **FastAPI** and **Google Gemini**, implementing a Perplexity-like multi-agent Q&A workflow.
 
