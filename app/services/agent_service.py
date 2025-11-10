@@ -4,7 +4,7 @@ import json
 from google import generativeai as genai
 from app.core.config import settings
 from app.services.web_search import search_and_get_snippets
-from app.utils import clean_citations
+from app.utils import normalize_citations
 from typing import AsyncGenerator, Dict, Any
 
 # --- Configure Gemini ---
@@ -132,7 +132,7 @@ async def _run_writer(
 
         async for chunk in stream:
             if chunk.text:
-                yield {"event": "chunk", "data": clean_citations(chunk.text)}
+                yield {"event": "chunk", "data": normalize_citations(chunk.text)}
 
         print(f"AGENT (Writer): Finished streaming answer.")
 

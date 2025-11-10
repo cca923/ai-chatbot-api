@@ -1,1 +1,1 @@
-from .citation_utils import clean_citations
+from .citation_utils import normalize_citations
