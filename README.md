@@ -22,21 +22,23 @@ You can check the [Live API Endpoint](https://ai-chatbot-api-lxkd.onrender.com) 
 
 ```
 ai-chatbot-api/
-├── app/                     # Main application source code
-│   ├── api/                 # API routing definitions
-│   │   ├── endpoints/       # Individual endpoint logic (e.g., chat.py)
-│   │   └── router.py        # Combines all endpoint routers
-│   ├── core/                # Core configuration
-│   │   └── config.py        # Pydantic settings, loads .env (GEMINI_API_KEY, CORS)
-│   ├── services/            # Business logic
-│   │   ├── agent_service.py # Multi-agent workflow (Planner, Researcher, Writer)
-│   │   └── web_search.py    # DDGS snippet-fetching service
-│   └── main.py              # FastAPI entry point, registers middleware & routers
-├── .env.example             # Example environment file
-├── PROMPT_LOG.md            # Record of key AI prompts and development decisions
-├── README.md                # This file
-├── requirements.txt         # Python dependencies
-└── run.py                   # Server launcher (for local dev & Render deployment)
+├── app/                      # Main application source code
+│   ├── api/                  # API routing definitions
+│   │   ├── endpoints/        # Individual endpoint logic (e.g., chat.py)
+│   │   └── router.py         # Combines all endpoint routers
+│   ├── core/                 # Core configuration
+│   │   └── config.py         # Pydantic settings, loads .env (GEMINI_API_KEY, CORS)
+│   ├── services/             # Business logic & AI agent utilities
+│   │   ├── agent_service.py  # Multi-agent workflow (Planner, Researcher, Writer)
+│   │   └── web_search.py     # DuckDuckGo Search snippet-fetching service
+│   ├── utils/                # Shared helpers and utility functions
+│   │   ├── citation_utils.py # Cleans and normalizes AI-generated citation formats
+│   └── main.py               # FastAPI entry point, registers middleware & routers
+├── .env.example              # Example environment file
+├── PROMPT_LOG.md             # Record of key AI prompts and development decisions
+├── README.md                 # Project overview and setup instructions
+├── requirements.txt          # Python dependencies
+└── run.py                    # Server launcher (for local development & Render deployment)
 ```
 
 ---

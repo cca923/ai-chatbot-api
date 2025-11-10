@@ -55,7 +55,7 @@ The issue was likely caused by the full-text scraper (`readability-lxml`) sendin
 
 **Prompt:**
 
-> The Writer agent is still being lazy. It sometimes outputs `[1]` or `(1)` instead of `[1](#citation-1)`.
+> The Writer agent is still inconsistent. It sometimes outputs `[1]`, `(1)`, or `[1, 3]` instead of properly formatted citations like `[1](#citation-1)`.
 
 **Outcome:**
-The writer prompt in `agent_service.py` was enhanced with examples and a **regex-based post-processing** step to enforce consistent citation formatting.
+The Writer prompt in `agent_service.py` was refined with explicit **correct vs. incorrect citation examples** to guide model behavior. A **regex-based post-processing step** was added to normalize citation output, and this logic was later migrated to `app/utils/citation_utils.py` for reusability.

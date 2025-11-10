@@ -4,6 +4,7 @@ import json
 from google import generativeai as genai
 from app.core.config import settings
 from app.services.web_search import search_and_get_snippets
+from app.utils import clean_citations
 from typing import AsyncGenerator, Dict, Any
 
 # --- Configure Gemini ---
@@ -112,7 +113,15 @@ async def _run_writer(
     6.  Your answer must be in Markdown format.
 
     EXAMPLE:
-    ...the sky is blue [1](#citation-1). AI is a complex field [2](#citation-2).
+    Correct:
+    - The sky is blue [1](#citation-1).
+    - AI is a complex field [2](#citation-2).
+    - Sometimes multiple sources can be cited like this: [1](#citation-1)[3](#citation-3).
+
+    Incorrect:
+    - The sky is blue [1].
+    - The sky is blue [1, 3].
+    - The sky is blue [1] (#citation-1).
 
     Now, generate the answer based *only* on the <Sources> provided.
     """
@@ -123,16 +132,7 @@ async def _run_writer(
 
         async for chunk in stream:
             if chunk.text:
-                text_chunk = chunk.text
-                # Fix mixed brackets around citation links: (#citation-1], [#citation-1), or [#citation-1] -> (#citation-1)
-                text_chunk = re.sub(
-                    r"[\[\(]#citation-(\d+)[\]\)]", r"(#citation-\1)", text_chunk
-                )
-                # Remove extra spaces between citation ID and link: [1] (#citation-1) -> [1](#citation-1)
-                text_chunk = re.sub(
-                    r"\[(\d+)\]\s+\(#citation-", r"[\1](#citation-", text_chunk
-                )
-                yield {"event": "chunk", "data": text_chunk}
+                yield {"event": "chunk", "data": clean_citations(chunk.text)}
 
         print(f"AGENT (Writer): Finished streaming answer.")
 
